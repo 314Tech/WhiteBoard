@@ -1,9 +1,10 @@
-﻿<Window x:Class="DrawingCanvas.MainWindow"
+﻿<Window x:Class="WhiteBoard.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:DrawingCanvas"
+        xmlns:cic="clr-namespace:CustomInkCanvas"
+        xmlns:local="clr-namespace:WhiteBoard"
         mc:Ignorable="d"
         Title="White Board" Height="600"  Width="1200" Background="Black">
     <DockPanel LastChildFill="True">
@@ -13,15 +14,21 @@
                 <ColumnDefinition Width="10" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <InkCanvas Grid.Column="0" Name="canvasLeft" Strokes="{Binding SynchedStrokes}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <InkCanvas.CommandBindings>
+            <cic:CustomInkCanvas Grid.Column="0" x:Name="canvasLeft" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <cic:CustomInkCanvas.CommandBindings>
                     <CommandBinding Command="{x:Static local:MainWindow.UndoCommand}" Executed="undo_click"/>
                     <CommandBinding Command="{x:Static local:MainWindow.RedoCommand}" Executed="redo_click"/>
                     <CommandBinding Command="{x:Static local:MainWindow.ClearCommand}" Executed="clear_click"/>
-                </InkCanvas.CommandBindings>
-            </InkCanvas>
+                </cic:CustomInkCanvas.CommandBindings>
+            </cic:CustomInkCanvas>
             <Border Grid.Column="1" Width="10" Background="Black" VerticalAlignment="Stretch"></Border>
-            <InkCanvas Grid.Column="2" Name="canvasRight" Strokes="{Binding SynchedStrokes}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"></InkCanvas>
+            <cic:CustomInkCanvas Grid.Column="2" x:Name="canvasRight"  HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <cic:CustomInkCanvas.CommandBindings>
+                    <CommandBinding Command="{x:Static local:MainWindow.UndoCommand}" Executed="undo_click"/>
+                    <CommandBinding Command="{x:Static local:MainWindow.RedoCommand}" Executed="redo_click"/>
+                    <CommandBinding Command="{x:Static local:MainWindow.ClearCommand}" Executed="clear_click"/>
+                </cic:CustomInkCanvas.CommandBindings>
+            </cic:CustomInkCanvas>
         </Grid>
     </DockPanel>
 </Window>

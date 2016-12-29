@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace DrawingCanvas.Properties
+namespace WhiteBoard.Properties
 {
 
 

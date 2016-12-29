@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows.Ink;
 
-namespace DrawingCanvas
+namespace WhiteBoard
 {
     public class SynchedStrokeCollection : StrokeCollection, INotifyPropertyChanged
     {
