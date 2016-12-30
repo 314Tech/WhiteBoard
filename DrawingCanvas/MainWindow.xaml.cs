@@ -5,6 +5,8 @@ using System.Windows.Controls;
 using System.Windows.Ink;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Collections.Generic;
+
 using CustomInkCanvas;
 
 namespace WhiteBoard
@@ -16,8 +18,8 @@ namespace WhiteBoard
     {
         #region Properties
         // Undone strokes collection 
-        private StrokeCollection _undoneCanvasLeftCollection = new StrokeCollection();
-        private StrokeCollection _undoneCanvasRightCollection = new StrokeCollection();
+        private Stack<Stroke> _undoLeftStrokesStack = new Stack<Stroke>();
+        private Stack<Stroke> _undoRightStrokesStack = new Stack<Stroke>();
 
         // Shared Strokes
         public SynchedStrokeCollection SynchedStrokes { get; set; }
@@ -27,6 +29,11 @@ namespace WhiteBoard
         public static RoutedCommand RedoCommand = new RoutedCommand();
         public static RoutedCommand ClearCommand = new RoutedCommand();
 
+        // Temporary strokes collection
+        private StrokeCollection tempStrokeCollection;
+
+        // GUID
+        private Guid metadataGuid = Guid.NewGuid();
         #endregion
 
         public MainWindow()
@@ -35,6 +42,7 @@ namespace WhiteBoard
             // Set the context for the binding methods running in XAML.
             // This is what makes the binding methods find the scope to run
             DataContext = this;
+            tempStrokeCollection = new StrokeCollection();
 
             // Initialization
             InitializeComponent();
@@ -83,28 +91,44 @@ namespace WhiteBoard
         // Undo the last stroke
         private void undo_click(object sender, RoutedEventArgs e)
         {
-            Console.WriteLine("Undo count: {0}", canvasRight.Strokes.Count);
+            CustomInkCanvas.CustomInkCanvas canvas = sender as CustomInkCanvas.CustomInkCanvas;
+            Console.WriteLine("Undo count: {0}", canvas.Strokes.Count);
 
-            //int strokesCount = canvasRight.Strokes.Count;
-            //if (strokesCount > 0)
-            //{
-            //    _undoneCollection.Add(canvasRight.Strokes[strokesCount - 1]);
-            //    canvasRight.Strokes.RemoveAt(strokesCount - 1);
-            //    canvasLeft.Strokes.RemoveAt(strokesCount - 1);
-            //}
+            int strokesDeleteIndex = canvas.Strokes.Count;
+            string tag = (canvas == canvasRight) ? "Blue" : "Red";
+            while (strokesDeleteIndex > 0)
+            {
+                if (canvas.Strokes[strokesDeleteIndex - 1].GetPropertyData(metadataGuid) as string == tag)
+                {
+                    if (tag == "Blue")
+                    {
+                        _undoRightStrokesStack.Push(canvasLeft.Strokes[strokesDeleteIndex - 1]);
+                    } else {
+                        _undoLeftStrokesStack.Push(canvasLeft.Strokes[strokesDeleteIndex - 1]);
+                    }
+                    // Remove the element
+                    canvasRight.Strokes.RemoveAt(strokesDeleteIndex - 1);
+                    canvasLeft.Strokes.RemoveAt(strokesDeleteIndex - 1);
+                    break;
+                }
+                strokesDeleteIndex--;
+            }
         }
 
         // Redo last Undo operation
         private void redo_click(object sender, RoutedEventArgs e)
         {
             Console.WriteLine("Redo count: {0}", canvasLeft.Strokes.Count);
-            //int strokesCount = _undoneCollection.Count;
-            //if (strokesCount > 0)
-            //{
-            //    canvasRight.Strokes.Insert(canvasRight.Strokes.Count, _undoneCollection[strokesCount - 1]);
-            //    canvasLeft.Strokes.Insert(canvasRight.Strokes.Count, _undoneCollection[strokesCount - 1]);
-            //    _undoneCollection.RemoveAt(strokesCount - 1);
-            //}
+            CustomInkCanvas.CustomInkCanvas canvas = sender as CustomInkCanvas.CustomInkCanvas;
+
+            Stack<Stroke> undoneStrokes = (canvas == canvasLeft) ? _undoLeftStrokesStack : _undoRightStrokesStack;
+            int strokesCount = undoneStrokes.Count;
+            if (strokesCount > 0)
+            {
+                var stroke = undoneStrokes.Pop();
+                canvasRight.Strokes.Insert(canvasRight.Strokes.Count, stroke);
+                canvasLeft.Strokes.Insert(canvasLeft.Strokes.Count, stroke);
+            }
         }
 
         // Undo the last stroke
@@ -112,13 +136,13 @@ namespace WhiteBoard
         {
             Console.WriteLine("Clear - Sender {0}", (sender as CustomInkCanvas.CustomInkCanvas).Name);
             //Save all strokes before clearing the canvas. We can then redo the clear
-            StrokeCollection strokeCollection;
-            strokeCollection = (sender == canvasLeft) ? _undoneCanvasLeftCollection :  
-            _undoneCanvasRightCollection;
+            Stack<Stroke> strokeCollection;
+            strokeCollection = (sender == canvasLeft) ? _undoLeftStrokesStack :  
+            _undoRightStrokesStack;
           
             foreach (var stroke in (sender as CustomInkCanvas.CustomInkCanvas).Strokes.Reverse())
             {
-                strokeCollection.Add(stroke);
+                strokeCollection.Push(stroke);
             }
             canvasRight.Strokes.Clear();
             canvasLeft.Strokes.Clear();
@@ -131,6 +155,7 @@ namespace WhiteBoard
             Stroke stroke = new Stroke(s);
             stroke.DrawingAttributes = SetAttributes(Colors.Red);
             canvasRight.Strokes.Add(stroke);
+            tempStrokeCollection.Add(stroke);
         }
 
         private void OnStylusPointsCollectedRight(CustomInkCanvas.CustomInkCanvas c, StylusPointCollection s)
@@ -138,12 +163,37 @@ namespace WhiteBoard
             Stroke stroke = new Stroke(s);
             stroke.DrawingAttributes = SetAttributes(Colors.Blue);
             canvasLeft.Strokes.Add(stroke);
+            tempStrokeCollection.Add(stroke);
         }
 
         private void OnStrokeCollected(object sender, InkCanvasStrokeCollectedEventArgs e)
         {
             Console.WriteLine("Stroke Changed - Sender {0}", (sender as CustomInkCanvas.CustomInkCanvas).Name);
             Console.WriteLine("Stroke Changed -  {0}", e.Stroke.ToString());
+
+            Console.WriteLine("Before: Left Canvas Count -  {0}", canvasLeft.Strokes.Count);
+            Console.WriteLine("Before: Right Canvas Count -  {0}", canvasRight.Strokes.Count);
+
+            CustomInkCanvas.CustomInkCanvas sourceCanvas;
+            CustomInkCanvas.CustomInkCanvas targetCanvas;
+
+            sourceCanvas = sender as CustomInkCanvas.CustomInkCanvas;
+            targetCanvas = (sender == canvasLeft) ? canvasRight : canvasLeft;
+
+            string tag = (sender != canvasLeft) ? "Blue" : "Red";
+
+            // Tag the stroke to show its canvas source editor
+            e.Stroke.AddPropertyData(metadataGuid, tag);
+
+            // Add last Stroke from the source canvas to the target
+            StrokeCollection newCollection = new StrokeCollection();
+            newCollection.Add(e.Stroke);
+            targetCanvas.Strokes.Replace(tempStrokeCollection,newCollection);
+
+            Console.WriteLine("After: Left Canvas Count -  {0}", canvasLeft.Strokes.Count);
+            Console.WriteLine("After: Right Canvas Count -  {0}", canvasRight.Strokes.Count);
+
+            tempStrokeCollection.Clear();
         }
         #endregion
     }
